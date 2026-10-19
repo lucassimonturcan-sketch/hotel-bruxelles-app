@@ -92,9 +92,9 @@ async function showList() {
 }
 
 /* ---------- Conversation ---------- */
-async function loadImg(path) {
+async function loadImg(path, ref = 'apercus') {
   if (imgCache[path]) return imgCache[path];
-  const r = await api(`/repos/${REPO}/contents/${path}?ref=apercus`, { raw: true, headers: { Accept: 'application/vnd.github.raw' } });
+  const r = await api(`/repos/${REPO}/contents/${path}?ref=${ref}`, { raw: true, headers: { Accept: 'application/vnd.github.raw' } });
   return (imgCache[path] = URL.createObjectURL(await r.blob()));
 }
 async function showThread(n, keepScroll) {
@@ -126,13 +126,15 @@ async function showThread(n, keepScroll) {
       if (working && k === lastBot) return;
       const t = cleanAI(b); if (t) html.push(`<div class="m m--ai"><div class="who">CLAUDE</div>${md(t)}</div>`);
     } else {
-      const t = userText(b); if (t) html.push(`<div class="m m--me">${md(t)}</div>`);
+      const pics = [...b.matchAll(/<!--photo:(\S+)-->/g)].map(x => x[1]);
+      const t = userText(b.replace(/^📷 Photo jointe.*$/gm, ''));
+      if (t || pics.length) html.push(`<div class="m m--me">${t ? md(t) : ''}${pics.length ? `<div class="shots">${pics.map(f => `<img data-src="${f}" data-ref="envois" alt="Photo envoyée">`).join('')}</div>` : ''}</div>`);
     }
   });
   const waiting = working || publishing || (waitingSince && Date.now() - waitingSince < 90000);
   if (waiting) html.push(`<div class="typing"><i></i><i></i><i></i>${publishing ? 'Publication en cours… (1 à 2 min)' : 'Claude travaille… (1 à 3 min)'}</div>`);
   main.innerHTML = `<div class="wrap"><div class="msgs">${html.join('')}</div></div>`;
-  main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src); im.onclick = () => zoom(im.src); });
+  main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src, im.dataset.ref || 'apercus'); im.onclick = () => zoom(im.src); });
   main.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => publish(issue, b.dataset.pub, b));
   main.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { txt.placeholder = 'Que faut-il changer ?'; txt.focus(); });
   main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => cancel(issue));
@@ -148,9 +150,11 @@ function zoom(src) {
 
 /* ---------- Actions ---------- */
 async function send() {
-  const t = txt.value.trim(); if (!t) return;
-  $('#send').disabled = true;
-  const body = '@claude ' + (mode === 'idea' ? '[Idée] ' : '') + t;
+  const t = txt.value.trim(); if (!t && !photos.length) return;
+  if (!t) return alert('Écrivez aussi où mettre la photo (par exemple : « mets cette photo en premier sur la page Restaurant »).');
+  $('#send').disabled = true; $('#send').textContent = '…';
+  let body = '@claude ' + (mode === 'idea' ? '[Idée] ' : '') + t;
+  try { body += await uploadPhotos(); } catch (e) { $('#send').disabled = false; $('#send').textContent = '➤'; return alert("La photo n'a pas pu être envoyée. Réessayez."); }
   try {
     if (current) await api(`/repos/${REPO}/issues/${current}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
     else {
@@ -158,9 +162,9 @@ async function send() {
       const i = await api(`/repos/${REPO}/issues`, { method: 'POST', body: JSON.stringify({ title, body, labels: ['app'] }) });
       current = i.number;
     }
-    txt.value = ''; autosize(); waitingSince = Date.now(); showThread(current);
+    txt.value = ''; photos = []; drawThumbs(); autosize(); waitingSince = Date.now(); showThread(current);
   } catch (e) { alert("L'envoi n'a pas marché. Vérifiez la connexion internet et réessayez."); }
-  $('#send').disabled = false;
+  $('#send').disabled = false; $('#send').textContent = '➤';
 }
 async function publish(issue, branch, btn) {
   if (!confirm('Mettre cette modification en ligne sur le vrai site ?')) return;
@@ -201,6 +205,51 @@ async function enableNotif() {
     alert('C’est activé ! Vous serez prévenu dès que Claude répond.'); showList();
   } catch (e) { alert('Activation impossible (' + e.message + '). L’application doit être ouverte depuis l’écran d’accueil.'); }
 }
+
+
+/* ---------- Photos ---------- */
+let photos = [];
+async function ensureBranch(name) {
+  const br = await api(`/repos/${REPO}/branches/${name}`);
+  if (!br._err) return;
+  const m = await api(`/repos/${REPO}/git/ref/heads/main`);
+  await api(`/repos/${REPO}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: 'refs/heads/' + name, sha: m.object.sha }) });
+}
+// réduit la photo (2000 px max, JPEG) pour un envoi rapide ; Claude la prépare ensuite pour le site
+function shrink(file) {
+  return new Promise((ok, ko) => {
+    const im = new Image(); im.onerror = ko;
+    im.onload = () => {
+      const k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.88));
+    };
+    im.src = URL.createObjectURL(file);
+  });
+}
+function drawThumbs() {
+  $('#thumbs').innerHTML = photos.map((p, i) => `<div><img src="${p}" alt=""><button data-i="${i}" aria-label="Retirer">×</button></div>`).join('');
+  $('#thumbs').querySelectorAll('button').forEach(b => b.onclick = () => { photos.splice(+b.dataset.i, 1); drawThumbs(); });
+  if (photos.length && !txt.value) txt.placeholder = 'Où faut-il mettre cette photo ?';
+}
+async function uploadPhotos() {
+  if (!photos.length) return '';
+  await ensureBranch('envois');
+  let out = '';
+  for (const [i, p] of photos.entries()) {
+    const path = `envois/${new Date().toISOString().slice(0, 10)}/${me}-${Date.now()}-${i + 1}.jpg`;
+    const r = await api(`/repos/${REPO}/contents/${path}`, { method: 'PUT', body: JSON.stringify({ message: 'Photo envoyée depuis l’application', branch: 'envois', content: p.split(',')[1] }) });
+    if (!r || r._err) throw new Error('envoi');
+    out += `\n<!--photo:${path}-->\n📷 Photo jointe : \`${path}\``;
+  }
+  return out;
+}
+$('#pic').onclick = () => $('#file').click();
+$('#file').onchange = async e => {
+  for (const f of [...e.target.files].slice(0, 6 - photos.length)) photos.push(await shrink(f));
+  e.target.value = ''; drawThumbs();
+};
 
 /* ---------- Saisie, dictée, mode ---------- */
 function setHint() { $('#hint').textContent = mode === 'idea' ? 'Claude réfléchit avec vous, sans rien changer sur le site.' : 'Claude prépare la modification et vous montre un aperçu avant publication.'; }
