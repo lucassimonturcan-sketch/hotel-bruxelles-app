@@ -11,7 +11,7 @@ self.addEventListener('fetch', e => {
 // Notification envoyée par GitHub quand Claude a répondu
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch (x) { d = { body: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Hôtel Bruxelles', { body: d.body || 'Claude a répondu.', icon: 'icons/favicon-192.png', badge: 'icons/favicon-192.png' }));
+  e.waitUntil(self.registration.showNotification(d.title || 'Hôtel Bruxelles', { body: d.body || 'L’agent a répondu.', icon: 'icons/favicon-192.png', badge: 'icons/favicon-192.png' }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
