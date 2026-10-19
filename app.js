@@ -32,7 +32,7 @@ function md(s) {
     const inl = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     if (lines.every(l => /^\s*([-*]|\d+\.)\s/.test(l)))
-      out.push('<ul>' + lines.map(l => '<li>' + inl(l.replace(/^\s*([-*]|\d+\.)\s+/, '').replace(/^\[x\]\s*/i, '✓ ').replace(/^\[ \]\s*/, '○ ')) + '</li>').join('') + '</ul>');
+      out.push('<ul>' + lines.map(l => '<li>' + inl(l.replace(/^\s*([-*]|\d+\.)\s+/, '').replace(/^\[[ x]\]\s*/i, '')) + '</li>').join('') + '</ul>');
     else out.push('<p>' + lines.map(l => inl(l.replace(/^#+\s*/, ''))).join('<br>') + '</p>');
   }
   return out.join('');
@@ -41,7 +41,7 @@ function md(s) {
 const cleanAI = b => b.replace(/<!--[\s\S]*?-->/g, '').split('\n')
   .filter(l => !/View job|Create PR|claude\/issue-|Claude finished|Claude Code is working|spinner|I'll analyze|Todo List|^\s*Aperçu ?:|^\s*-{3,}\s*$|^\s*—+\s*$/i.test(l))
   .join('\n').replace(/<img[^>]*>/g, '').trim();
-const userText = b => b.replace(/<!--[\s\S]*?-->/g, '').replace(/^(📷|📎) .*$/gm, '').replace(/@claude\s*/gi, '').replace(/^\[Idée\]\s*/i, '').trim();
+const userText = b => b.replace(/<!--[\s\S]*?-->/g, '').replace(/^(📷 |📎 )?(Photo jointe|Fichier joint) .*$/gm, '').replace(/@claude\s*/gi, '').replace(/^\[Idée\]\s*/i, '').trim();
 const dayLabel = d => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const labelsOf = i => i.labels.map(l => l.name);
 
@@ -79,23 +79,23 @@ function renderIssue(issue, comments) {
   const html = [`<div class="day">${dayLabel(issue.created_at)}</div>`];
   all.forEach((c, k) => {
     const b = c.body || '';
-    if (/<!--publie-->/.test(b)) return html.push(`<div class="m m--sys">✅ Publié sur le site</div>`);
+    if (/<!--publie-->/.test(b)) return html.push(`<div class="m m--sys">Publié sur le site</div>`);
     if (/<!--annule-->/.test(b)) return html.push(`<div class="m m--sys">Modification annulée, rien n’a changé sur le site</div>`);
-    if (/<!--echec-->/.test(b)) return html.push(`<div class="m m--sys">⚠️ La publication n’a pas pu se faire. Rien n’a changé sur le site. Prévenez Lucas.</div>`);
+    if (/<!--echec-->/.test(b)) return html.push(`<div class="m m--sys">La publication n’a pas pu se faire. Rien n’a changé sur le site. Prévenez Lucas.</div>`);
     const shot = b.match(/<!--apercu:(\S+) ([^>]*?)-->/);
     if (shot) {
       const acts = k === lastShot && !settled && !working && !publishing
-        ? `<div class="acts"><button class="btn btn--ok" data-pub="${issue.number}">✅ Publier</button><button class="btn btn--line" data-edit>✏️ Modifier</button><button class="btn btn--no" data-cancel="${issue.number}" data-branch="${shot[1]}">✕ Annuler</button></div>` : '';
-      return html.push(`<div class="m m--ai"><div class="who">APERÇU</div><p>Voici à quoi ça ressemble (téléphone et ordinateur) :</p><div class="shots">${shot[2].trim().split(/\s+/).map(f => `<img data-src="${f}" data-ref="apercus" alt="Aperçu">`).join('')}</div>${acts}</div>`);
+        ? `<div class="acts"><button class="btn btn--ok" data-pub="${issue.number}">Publier</button><button class="btn btn--line" data-edit>Modifier</button><button class="btn btn--no" data-cancel="${issue.number}" data-branch="${shot[1]}">Annuler</button></div>` : '';
+      return html.push(`<div class="m m--ai"><div class="cap">Aperçu sur téléphone et ordinateur</div><div class="shots">${shot[2].trim().split(/\s+/).map(f => `<img data-src="${f}" data-ref="apercus" alt="Aperçu">`).join('')}</div>${acts}</div>`);
     }
     if (c.user.type === 'Bot' || /\[bot\]$/.test(c.user.login)) {
       if (working && k === lastBot) return; // message provisoire (en anglais) remplacé par « Claude travaille… »
-      const t = cleanAI(b); if (t) html.push(`<div class="m m--ai"><div class="who">CLAUDE</div>${md(t)}</div>`);
+      const t = cleanAI(b); if (t) html.push(`<div class="m m--ai">${md(t)}</div>`);
     } else {
       const pics = [...b.matchAll(/<!--photo:(\S+)-->/g)].map(x => x[1]);
       const docs = [...b.matchAll(/<!--fichier:(\S+)-->/g)].map(x => x[1].split('/').pop());
       const t = userText(b);
-      if (t || pics.length || docs.length) html.push(`<div class="m m--me">${t ? md(t) : ''}${pics.length ? `<div class="shots">${pics.map(f => `<img data-src="${f}" data-ref="envois" alt="Photo envoyée">`).join('')}</div>` : ''}${docs.map(d => `<div class="file">📎 ${esc(d)}</div>`).join('')}</div>`);
+      if (t || pics.length || docs.length) html.push(`<div class="m m--me">${t ? md(t) : ''}${pics.length ? `<div class="shots">${pics.map(f => `<img data-src="${f}" data-ref="envois" alt="Photo envoyée">`).join('')}</div>` : ''}${docs.map(d => `<div class="file">Fichier : ${esc(d)}</div>`).join('')}</div>`);
     }
   });
   return html.join('');
@@ -119,10 +119,10 @@ async function showChat() {
   if (!busy && waitingSince && Date.now() - waitingSince > 90000) waitingSince = 0;
   const canNotif = VAPID_PUBLIC && 'PushManager' in window && 'Notification' in window && Notification.permission === 'default';
   main.innerHTML = `<div class="wrap"><div class="msgs">
-    ${issues.length ? '' : '<div class="m m--ai"><div class="who">CLAUDE</div><p>Bonjour ! Je connais tout le site de l’Hôtel Bruxelles. Posez-moi une question, donnez-moi une idée, ou dites-moi ce qu’il faut changer. Vous pouvez joindre des photos avec 📎.</p></div>'}
+    ${issues.length ? '' : '<div class="m m--ai"><p>Bonjour. Je connais tout le site de l’Hôtel Bruxelles. Posez-moi une question, proposez une idée ou dites-moi ce qu’il faut changer. Vous pouvez joindre des photos et des fichiers.</p></div>'}
     ${issues.map((i, n) => renderIssue(i, comments[n])).join('')}
-    ${waiting ? `<div class="typing"><i></i><i></i><i></i>${publishing ? 'Publication en cours… (1 à 2 min)' : 'Claude travaille… (environ 1 min)'}</div>` : ''}
-    ${canNotif ? '<button class="btn btn--line" id="notif">🔔 Être prévenu quand Claude répond</button>' : ''}
+    ${waiting ? `<div class="typing"><svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.2L20 6l-4.4 4.8L22 12l-6.4 1.2L20 18l-6.4-2.2L12 22l-1.6-6.2L4 18l4.4-4.8L2 12l6.4-1.2L4 6l6.4 2.2z"/></svg>${publishing ? 'Publication en cours… (1 à 2 min)' : 'Claude travaille… (environ 1 min)'}</div>` : ''}
+    ${canNotif ? '<button class="notif" id="notif">Être prévenu quand Claude répond</button>' : ''}
   </div></div>`;
   main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src, im.dataset.ref); im.onclick = () => zoom(im.src); });
   main.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => publish(+b.dataset.pub, b));
@@ -144,7 +144,7 @@ async function send() {
   const t = txt.value.trim();
   if (!t && !files.length) return;
   if (!t) return alert('Écrivez aussi ce qu’il faut en faire (par exemple : « mets ces photos dans la galerie »).');
-  $('#send').disabled = true; $('#send').textContent = '…';
+  $('#send').disabled = true; $('#send').disabled = true;
   try {
     const body = '@claude ' + t + await uploadFiles();
     // on continue la série en cours, sauf après une longue pause : Claude relit ainsi moins de choses
@@ -159,7 +159,7 @@ async function send() {
     txt.value = ''; files = []; drawThumbs(); autosize(); txt.placeholder = 'Écrire à Claude…';
     waitingSince = Date.now(); showChat.done = false; showChat();
   } catch (e) { alert("L'envoi n'a pas marché. Vérifiez la connexion internet et réessayez."); }
-  $('#send').disabled = false; $('#send').textContent = '➤';
+  $('#send').disabled = false;
 }
 async function publish(n, btn) {
   if (!confirm('Mettre cette modification en ligne sur le vrai site ?')) return;
@@ -170,7 +170,7 @@ async function publish(n, btn) {
     if (r && r._err) throw new Error('GitHub ' + r._err);
     waitingSince = Date.now(); showChat();
   } catch (e) {
-    btn.disabled = false; btn.textContent = '✅ Publier';
+    btn.disabled = false; btn.textContent = 'Publier';
     alert('La publication a échoué (' + (e.message || 'erreur') + '). Prévenez Lucas.');
   }
 }
@@ -205,7 +205,7 @@ function shrink(file) {
 }
 const readRaw = file => new Promise((ok, ko) => { const r = new FileReader(); r.onerror = ko; r.onload = () => ok({ name: file.name, data: r.result, img: false }); r.readAsDataURL(file); });
 function drawThumbs() {
-  $('#thumbs').innerHTML = files.map((f, i) => `<div>${f.img ? `<img src="${f.data}" alt="">` : `<span class="doc">📎 ${esc(f.name)}</span>`}<button data-i="${i}" aria-label="Retirer">×</button></div>`).join('');
+  $('#thumbs').innerHTML = files.map((f, i) => `<div>${f.img ? `<img src="${f.data}" alt="">` : `<span class="doc">${esc(f.name)}</span>`}<button data-i="${i}" aria-label="Retirer">×</button></div>`).join('');
   $('#thumbs').querySelectorAll('button').forEach(b => b.onclick = () => { files.splice(+b.dataset.i, 1); drawThumbs(); });
   if (files.length && !txt.value) txt.placeholder = 'Que faut-il en faire ?';
 }
@@ -219,7 +219,7 @@ async function uploadFiles() {
     const path = `envois/${day}/${me}-${stamp}-${i + 1}-${safe}`;
     const r = await post(`/contents/${path}`, { message: 'Fichier envoyé depuis l’application', branch: 'envois', content: f.data.split(',')[1] }, 'PUT');
     if (!r || r._err) throw new Error('envoi');
-    out += f.img ? `\n<!--photo:${path}-->\n📷 Photo jointe : \`${path}\`` : `\n<!--fichier:${path}-->\n📎 Fichier joint : \`${path}\``;
+    out += f.img ? `\n<!--photo:${path}-->\nPhoto jointe : \`${path}\`` : `\n<!--fichier:${path}-->\nFichier joint : \`${path}\``;
   }
   return out;
 }
@@ -263,10 +263,10 @@ if (SR) {
     const base = txt.value ? txt.value + ' ' : '';
     rec.onresult = e => { txt.value = base + [...e.results].map(r => r[0].transcript).join(' '); autosize(); };
     rec.onend = () => { rec = null; $('#mic').classList.remove('rec'); };
-    rec.onerror = () => alert('Dictée indisponible ici : utilisez le micro 🎤 du clavier de l’iPhone.');
+    rec.onerror = () => alert('Dictée indisponible ici : utilisez le micro du clavier de l’iPhone.');
     rec.start(); $('#mic').classList.add('rec');
   };
-} else $('#mic').onclick = () => { txt.focus(); alert('Appuyez sur le micro 🎤 du clavier de l’iPhone pour dicter.'); };
+} else $('#mic').onclick = () => { txt.focus(); alert('Appuyez sur le micro du clavier de l’iPhone pour dicter.'); };
 function stopPoll() { clearTimeout(poll); poll = null; }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && token) showChat(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
