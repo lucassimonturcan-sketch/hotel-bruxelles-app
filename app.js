@@ -2,6 +2,7 @@
 const REPO = 'lucassimonturcan-sketch/hotel-bruxelles';
 const SITE = 'https://www.andorrahotelbruxelles.com/fr/';
 const API = 'https://api.github.com';
+const VAPID_PUBLIC = ''; // clé publique des notifications (variable VAPID_PUBLIC_KEY du dépôt)
 const $ = s => document.querySelector(s);
 const main = $('#main'), compose = $('#compose'), txt = $('#txt');
 let token = localStorage.getItem('hb_token') || '';
@@ -33,7 +34,7 @@ function md(s) {
 // Nettoie les messages de Claude (en-têtes techniques, liens de branche…)
 function cleanAI(b) {
   return b.replace(/<!--[\s\S]*?-->/g, '').split('\n')
-    .filter(l => !/View job|Create PR|claude\/issue-|Claude finished|Claude Code is working|spinner|I'll analyze|Todo List|^\s*- \[[ x]\] |^\s*-{3,}\s*$|^\s*—+\s*$/i.test(l))
+    .filter(l => !/View job|Create PR|claude\/issue-|Claude finished|Claude Code is working|spinner|I'll analyze|Todo List|^\s*Aperçu ?:|^\s*-{3,}\s*$|^\s*—+\s*$/i.test(l))
     .join('\n').replace(/<img[^>]*>/g, '').trim();
 }
 const userText = b => b.replace(/<!--[\s\S]*?-->/g, '').replace(/@claude\s*/gi, '').replace(/^\[Idée\]\s*/i, '💡 ').trim();
@@ -68,6 +69,7 @@ function logout() { localStorage.removeItem('hb_token'); token = ''; showLogin()
 function status(i) {
   const labels = i.labels.map(l => l.name);
   if (labels.includes('en-cours')) return ['tag--work', 'Claude travaille…'];
+  if (labels.includes('publier') && i.state === 'open') return ['tag--work', 'Publication…'];
   if (i.state === 'closed') return i.state_reason === 'not_planned' ? ['', 'Annulée'] : ['tag--ok', 'Publiée'];
   return ['tag--wait', 'À regarder'];
 }
@@ -78,11 +80,14 @@ async function showList() {
   const items = await api(`/repos/${REPO}/issues?labels=app&state=all&per_page=40&sort=updated`);
   const open = items.filter(i => i.state === 'open'), closed = items.filter(i => i.state === 'closed');
   const card = i => { const [c, t] = status(i); return `<button class="card" data-n="${i.number}"><h3>${esc(i.title)}</h3><span class="tag ${c}">${t}</span><span class="meta">${ago(i.updated_at)}</span></button>`; };
+  const canNotif = VAPID_PUBLIC && 'PushManager' in window && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied';
   main.innerHTML = `<div class="wrap list">
+    ${canNotif ? '<button class="btn btn--dark" id="notif" style="margin-bottom:14px">🔔 Être prévenu quand Claude répond</button>' : ''}
     ${items.length ? '' : '<div class="empty">Aucune demande pour l’instant.<br>Écrivez ci-dessous ce que vous voulez changer sur le site, ou une idée.</div>'}
     ${open.length ? '<div class="sec">En cours</div>' + open.map(card).join('') : ''}
     ${closed.length ? '<div class="sec">Terminées</div>' + closed.slice(0, 15).map(card).join('') : ''}</div>`;
   main.querySelectorAll('[data-n]').forEach(b => b.onclick = () => showThread(+b.dataset.n));
+  if ($('#notif')) $('#notif').onclick = enableNotif;
   if (open.some(i => i.labels.some(l => l.name === 'en-cours'))) poll = setTimeout(showList, 15000);
 }
 
@@ -99,6 +104,7 @@ async function showThread(n, keepScroll) {
   header(issue.title, status(issue)[1], true);
   compose.classList.toggle('hidden', issue.state === 'closed'); txt.placeholder = 'Répondre…'; setHint();
   const working = issue.labels.some(l => l.name === 'en-cours');
+  const publishing = issue.state === 'open' && issue.labels.some(l => l.name === 'publier');
   const all = [{ user: issue.user, body: issue.body || '', created_at: issue.created_at }, ...comments];
   const lastShot = all.map(c => /<!--apercu:/.test(c.body)).lastIndexOf(true);
   const lastBot = all.map(c => c.user.login === 'claude[bot]').lastIndexOf(true);
@@ -106,11 +112,12 @@ async function showThread(n, keepScroll) {
   all.forEach((c, k) => {
     const b = c.body || '';
     if (/<!--publie-->/.test(b)) return html.push(`<div class="m m--sys">✅ Publié sur le site · ${ago(c.created_at)}</div>`);
+    if (/<!--echec-->/.test(b)) return html.push(`<div class="m m--sys">⚠️ La publication n’a pas pu se faire. Rien n’a changé sur le site. Prévenez Lucas.</div>`);
     if (/<!--annule-->/.test(b)) return html.push(`<div class="m m--sys">Demande annulée</div>`);
     const shot = b.match(/<!--apercu:(\S+) ([^>]*?)-->/);
     if (shot) {
       const files = shot[2].trim().split(/\s+/);
-      const acts = k === lastShot && issue.state === 'open' && !working
+      const acts = k === lastShot && issue.state === 'open' && !working && !publishing
         ? `<div class="acts"><button class="btn btn--ok" data-pub="${shot[1]}">✅ Publier</button><button class="btn btn--line" data-edit>✏️ Modifier</button><button class="btn btn--no" data-cancel>✕ Annuler</button></div>` : '';
       return html.push(`<div class="m m--ai"><div class="who">APERÇU</div><p>Voici à quoi ça ressemble (téléphone et ordinateur) :</p><div class="shots">${files.map(f => `<img data-src="${f}" alt="Aperçu">`).join('')}</div>${acts}</div>`);
     }
@@ -122,8 +129,8 @@ async function showThread(n, keepScroll) {
       const t = userText(b); if (t) html.push(`<div class="m m--me">${md(t)}</div>`);
     }
   });
-  const waiting = working || (waitingSince && Date.now() - waitingSince < 90000);
-  if (waiting) html.push('<div class="typing"><i></i><i></i><i></i>Claude travaille… (1 à 3 min)</div>');
+  const waiting = working || publishing || (waitingSince && Date.now() - waitingSince < 90000);
+  if (waiting) html.push(`<div class="typing"><i></i><i></i><i></i>${publishing ? 'Publication en cours… (1 à 2 min)' : 'Claude travaille… (1 à 3 min)'}</div>`);
   main.innerHTML = `<div class="wrap"><div class="msgs">${html.join('')}</div></div>`;
   main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src); im.onclick = () => zoom(im.src); });
   main.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => publish(issue, b.dataset.pub, b));
@@ -159,14 +166,10 @@ async function publish(issue, branch, btn) {
   if (!confirm('Mettre cette modification en ligne sur le vrai site ?')) return;
   btn.disabled = true; btn.textContent = 'Publication…';
   try {
-    let pr = await api(`/repos/${REPO}/pulls`, { method: 'POST', body: JSON.stringify({ title: issue.title, head: branch, base: 'main', body: `Demande #${issue.number} (application Hôtel Bruxelles)` }) });
-    if (pr._err) pr = (await api(`/repos/${REPO}/pulls?head=${REPO.split('/')[0]}:${branch}&state=open`))[0];
-    const m = await api(`/repos/${REPO}/pulls/${pr.number}/merge`, { method: 'PUT', body: JSON.stringify({ merge_method: 'squash' }) });
-    if (!m || m._err) throw new Error(m && m.message);
-    await api(`/repos/${REPO}/issues/${issue.number}/comments`, { method: 'POST', body: JSON.stringify({ body: '<!--publie-->\n✅ Publié depuis l’application. Le site sera à jour dans 2 à 3 minutes.' }) });
-    await api(`/repos/${REPO}/issues/${issue.number}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed', state_reason: 'completed' }) });
-    alert('C’est publié ! Le site sera à jour dans 2 à 3 minutes.');
-    showThread(issue.number);
+    // GitHub fusionne, reconstruit le site et l'envoie chez Dinatur (workflow « Publier une demande »)
+    const r = await api(`/repos/${REPO}/issues/${issue.number}/labels`, { method: 'POST', body: JSON.stringify({ labels: ['publier'] }) });
+    if (r && r._err) throw new Error('GitHub ' + r._err);
+    waitingSince = Date.now(); showThread(issue.number);
   } catch (e) {
     btn.disabled = false; btn.textContent = '✅ Publier';
     alert('La publication a échoué (' + (e.message || 'erreur') + '). Prévenez Lucas.');
@@ -177,6 +180,26 @@ async function cancel(issue) {
   await api(`/repos/${REPO}/issues/${issue.number}/comments`, { method: 'POST', body: JSON.stringify({ body: '<!--annule-->\nDemande annulée depuis l’application.' }) });
   await api(`/repos/${REPO}/issues/${issue.number}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed', state_reason: 'not_planned' }) });
   showList();
+}
+
+
+/* ---------- Notifications ---------- */
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+function keyBytes(k) { const p = '='.repeat((4 - k.length % 4) % 4), r = atob((k + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); }
+async function enableNotif() {
+  try {
+    if (await Notification.requestPermission() !== 'granted') return alert('Les notifications sont refusées. Vous pourrez les activer dans Réglages › Notifications.');
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC) });
+    // l'abonnement est rangé dans le dépôt (branche « notifications ») pour que GitHub puisse prévenir ce téléphone
+    const br = await api(`/repos/${REPO}/branches/notifications`);
+    if (br._err) { const m = await api(`/repos/${REPO}/git/ref/heads/main`); await api(`/repos/${REPO}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: 'refs/heads/notifications', sha: m.object.sha }) }); }
+    const id = (await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub.endpoint))), h = [...new Uint8Array(id)].slice(0, 6).map(x => x.toString(16).padStart(2, '0')).join('');
+    const path = `abonnements/${me}-${h}.json`;
+    const old = await api(`/repos/${REPO}/contents/${path}?ref=notifications`);
+    await api(`/repos/${REPO}/contents/${path}`, { method: 'PUT', body: JSON.stringify({ message: 'Notifications : ' + me, branch: 'notifications', content: b64(JSON.stringify({ login: me, sub })), ...(old.sha ? { sha: old.sha } : {}) }) });
+    alert('C’est activé ! Vous serez prévenu dès que Claude répond.'); showList();
+  } catch (e) { alert('Activation impossible (' + e.message + '). L’application doit être ouverte depuis l’écran d’accueil.'); }
 }
 
 /* ---------- Saisie, dictée, mode ---------- */
@@ -202,4 +225,5 @@ if (SR) {
 function stopPoll() { clearTimeout(poll); poll = null; }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && token) current ? showThread(current, true) : showList(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-token ? showList().catch(() => showLogin('Connexion impossible pour le moment.')) : showLogin();
+const startN = +new URLSearchParams(location.search).get('n');
+token ? (startN ? showThread(startN) : showList()).catch(() => showLogin('Connexion impossible pour le moment.')) : showLogin();
