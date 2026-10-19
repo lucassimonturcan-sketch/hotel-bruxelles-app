@@ -69,26 +69,24 @@ function logout() { localStorage.removeItem('hb_token'); token = ''; showLogin()
 function status(i) {
   const labels = i.labels.map(l => l.name);
   if (labels.includes('en-cours')) return ['tag--work', 'Claude travaille…'];
-  if (labels.includes('publier') && i.state === 'open') return ['tag--work', 'Publication…'];
-  if (i.state === 'closed') return i.state_reason === 'not_planned' ? ['', 'Annulée'] : ['tag--ok', 'Publiée'];
-  return ['tag--wait', 'À regarder'];
+  if (labels.includes('publier')) return ['tag--work', 'Publication…'];
+  if (labels.includes('a-valider')) return ['tag--wait', 'Aperçu à valider'];
+  return ['', ''];
 }
 async function showList() {
-  stopPoll(); current = null; header('Hôtel Bruxelles', 'Vos demandes', false);
-  compose.classList.remove('hidden'); txt.placeholder = 'Nouvelle demande…'; setHint();
+  stopPoll(); current = null; header('Hôtel Bruxelles', 'Vos conversations', false);
+  compose.classList.remove('hidden'); txt.placeholder = 'Nouvelle conversation…'; setHint();
   main.innerHTML = '<div class="wrap"><div class="empty">Chargement…</div></div>';
-  const items = await api(`/repos/${REPO}/issues?labels=app&state=all&per_page=40&sort=updated`);
-  const open = items.filter(i => i.state === 'open'), closed = items.filter(i => i.state === 'closed');
-  const card = i => { const [c, t] = status(i); return `<button class="card" data-n="${i.number}"><h3>${esc(i.title)}</h3><span class="tag ${c}">${t}</span><span class="meta">${ago(i.updated_at)}</span></button>`; };
+  const items = await api(`/repos/${REPO}/issues?labels=app&state=all&per_page=50&sort=updated`);
+  const card = i => { const [c, t] = status(i); return `<button class="card" data-n="${i.number}"><h3>${esc(i.title)}</h3>${t ? `<span class="tag ${c}">${t}</span>` : ''}<span class="meta">${ago(i.updated_at)}</span></button>`; };
   const canNotif = VAPID_PUBLIC && 'PushManager' in window && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied';
   main.innerHTML = `<div class="wrap list">
     ${canNotif ? '<button class="btn btn--dark" id="notif" style="margin-bottom:14px">🔔 Être prévenu quand Claude répond</button>' : ''}
-    ${items.length ? '' : '<div class="empty">Aucune demande pour l’instant.<br>Écrivez ci-dessous ce que vous voulez changer sur le site, ou une idée.</div>'}
-    ${open.length ? '<div class="sec">En cours</div>' + open.map(card).join('') : ''}
-    ${closed.length ? '<div class="sec">Terminées</div>' + closed.slice(0, 15).map(card).join('') : ''}</div>`;
+    <div class="sec">Nouvelle conversation : écrivez en bas</div>
+    ${items.length ? '<div class="sec">Conversations</div>' + items.map(card).join('') : '<div class="empty">Écrivez ci-dessous ce que vous voulez changer sur le site, ou une idée.</div>'}</div>`;
   main.querySelectorAll('[data-n]').forEach(b => b.onclick = () => showThread(+b.dataset.n));
   if ($('#notif')) $('#notif').onclick = enableNotif;
-  if (open.some(i => i.labels.some(l => l.name === 'en-cours'))) poll = setTimeout(showList, 15000);
+  if (items.some(i => i.labels.some(l => ['en-cours', 'publier'].includes(l.name)))) poll = setTimeout(showList, 15000);
 }
 
 /* ---------- Conversation ---------- */
@@ -101,24 +99,25 @@ async function showThread(n, keepScroll) {
   stopPoll(); current = n;
   const [issue, comments] = await Promise.all([api(`/repos/${REPO}/issues/${n}`), api(`/repos/${REPO}/issues/${n}/comments?per_page=100`)]);
   if (current !== n) return;
-  header(issue.title, status(issue)[1], true);
-  compose.classList.toggle('hidden', issue.state === 'closed'); txt.placeholder = 'Répondre…'; setHint();
+  header(issue.title, status(issue)[1] || 'Conversation', true);
+  compose.classList.remove('hidden'); txt.placeholder = 'Écrire à Claude…'; setHint();
   const working = issue.labels.some(l => l.name === 'en-cours');
-  const publishing = issue.state === 'open' && issue.labels.some(l => l.name === 'publier');
+  const publishing = issue.labels.some(l => l.name === 'publier');
   const all = [{ user: issue.user, body: issue.body || '', created_at: issue.created_at }, ...comments];
   const lastShot = all.map(c => /<!--apercu:/.test(c.body)).lastIndexOf(true);
+  const settled = all.slice(lastShot + 1).some(c => /<!--(publie|annule)-->/.test(c.body));
   const lastBot = all.map(c => c.user.login === 'claude[bot]').lastIndexOf(true);
   const html = [];
   all.forEach((c, k) => {
     const b = c.body || '';
     if (/<!--publie-->/.test(b)) return html.push(`<div class="m m--sys">✅ Publié sur le site · ${ago(c.created_at)}</div>`);
     if (/<!--echec-->/.test(b)) return html.push(`<div class="m m--sys">⚠️ La publication n’a pas pu se faire. Rien n’a changé sur le site. Prévenez Lucas.</div>`);
-    if (/<!--annule-->/.test(b)) return html.push(`<div class="m m--sys">Demande annulée</div>`);
+    if (/<!--annule-->/.test(b)) return html.push(`<div class="m m--sys">Modification annulée, rien n’a changé sur le site</div>`);
     const shot = b.match(/<!--apercu:(\S+) ([^>]*?)-->/);
     if (shot) {
       const files = shot[2].trim().split(/\s+/);
-      const acts = k === lastShot && issue.state === 'open' && !working && !publishing
-        ? `<div class="acts"><button class="btn btn--ok" data-pub="${shot[1]}">✅ Publier</button><button class="btn btn--line" data-edit>✏️ Modifier</button><button class="btn btn--no" data-cancel>✕ Annuler</button></div>` : '';
+      const acts = k === lastShot && !settled && !working && !publishing
+        ? `<div class="acts"><button class="btn btn--ok" data-pub="${shot[1]}">✅ Publier</button><button class="btn btn--line" data-edit>✏️ Modifier</button><button class="btn btn--no" data-cancel="${shot[1]}">✕ Annuler</button></div>` : '';
       return html.push(`<div class="m m--ai"><div class="who">APERÇU</div><p>Voici à quoi ça ressemble (téléphone et ordinateur) :</p><div class="shots">${files.map(f => `<img data-src="${f}" alt="Aperçu">`).join('')}</div>${acts}</div>`);
     }
     if (c.user.type === 'Bot' || /\[bot\]$/.test(c.user.login)) {
@@ -137,7 +136,7 @@ async function showThread(n, keepScroll) {
   main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src, im.dataset.ref || 'apercus'); im.onclick = () => zoom(im.src); });
   main.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => publish(issue, b.dataset.pub, b));
   main.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { txt.placeholder = 'Que faut-il changer ?'; txt.focus(); });
-  main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => cancel(issue));
+  main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => cancel(issue, b.dataset.cancel));
   if (!keepScroll || waiting) main.scrollTop = main.scrollHeight;
   if (!working && waitingSince && Date.now() - waitingSince > 90000) waitingSince = 0;
   if (waiting) poll = setTimeout(() => showThread(n, true), 8000);
@@ -156,7 +155,10 @@ async function send() {
   let body = '@claude ' + (mode === 'idea' ? '[Idée] ' : '') + t;
   try { body += await uploadPhotos(); } catch (e) { $('#send').disabled = false; $('#send').textContent = '➤'; return alert("La photo n'a pas pu être envoyée. Réessayez."); }
   try {
-    if (current) await api(`/repos/${REPO}/issues/${current}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+    if (current) {
+      await api(`/repos/${REPO}/issues/${current}`, { method: 'PATCH', body: JSON.stringify({ state: 'open' }) });
+      await api(`/repos/${REPO}/issues/${current}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+    }
     else {
       const title = (mode === 'idea' ? '💡 ' : '') + (t.length > 60 ? t.slice(0, 57).trim() + '…' : t);
       const i = await api(`/repos/${REPO}/issues`, { method: 'POST', body: JSON.stringify({ title, body, labels: ['app'] }) });
@@ -179,11 +181,12 @@ async function publish(issue, branch, btn) {
     alert('La publication a échoué (' + (e.message || 'erreur') + '). Prévenez Lucas.');
   }
 }
-async function cancel(issue) {
-  if (!confirm('Annuler cette demande ? Rien ne sera changé sur le site.')) return;
-  await api(`/repos/${REPO}/issues/${issue.number}/comments`, { method: 'POST', body: JSON.stringify({ body: '<!--annule-->\nDemande annulée depuis l’application.' }) });
-  await api(`/repos/${REPO}/issues/${issue.number}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed', state_reason: 'not_planned' }) });
-  showList();
+async function cancel(issue, branch) {
+  if (!confirm('Annuler cette modification ? Rien ne sera changé sur le site, et vous pourrez continuer la conversation.')) return;
+  await api(`/repos/${REPO}/issues/${issue.number}/comments`, { method: 'POST', body: JSON.stringify({ body: '<!--annule-->\nModification annulée depuis l’application.' }) });
+  if (branch) await api(`/repos/${REPO}/git/refs/heads/${branch}`, { method: 'DELETE' });
+  await api(`/repos/${REPO}/issues/${issue.number}/labels/a-valider`, { method: 'DELETE' });
+  showThread(issue.number);
 }
 
 
