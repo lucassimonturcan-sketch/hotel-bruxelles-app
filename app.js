@@ -33,7 +33,7 @@ function md(s) {
 // Nettoie les messages de Claude (en-têtes techniques, liens de branche…)
 function cleanAI(b) {
   return b.replace(/<!--[\s\S]*?-->/g, '').split('\n')
-    .filter(l => !/View job|Create PR|claude\/issue-|Claude finished|Claude Code is working|spinner|^\s*-{3,}\s*$|^\s*—+\s*$/i.test(l))
+    .filter(l => !/View job|Create PR|claude\/issue-|Claude finished|Claude Code is working|spinner|I'll analyze|Todo List|^\s*- \[[ x]\] |^\s*-{3,}\s*$|^\s*—+\s*$/i.test(l))
     .join('\n').replace(/<img[^>]*>/g, '').trim();
 }
 const userText = b => b.replace(/<!--[\s\S]*?-->/g, '').replace(/@claude\s*/gi, '').replace(/^\[Idée\]\s*/i, '💡 ').trim();
@@ -101,6 +101,7 @@ async function showThread(n, keepScroll) {
   const working = issue.labels.some(l => l.name === 'en-cours');
   const all = [{ user: issue.user, body: issue.body || '', created_at: issue.created_at }, ...comments];
   const lastShot = all.map(c => /<!--apercu:/.test(c.body)).lastIndexOf(true);
+  const lastBot = all.map(c => c.user.login === 'claude[bot]').lastIndexOf(true);
   const html = [];
   all.forEach((c, k) => {
     const b = c.body || '';
@@ -114,6 +115,8 @@ async function showThread(n, keepScroll) {
       return html.push(`<div class="m m--ai"><div class="who">APERÇU</div><p>Voici à quoi ça ressemble (téléphone et ordinateur) :</p><div class="shots">${files.map(f => `<img data-src="${f}" alt="Aperçu">`).join('')}</div>${acts}</div>`);
     }
     if (c.user.type === 'Bot' || /\[bot\]$/.test(c.user.login)) {
+      // pendant le travail, le message provisoire de Claude (en anglais) est remplacé par « Claude travaille… »
+      if (working && k === lastBot) return;
       const t = cleanAI(b); if (t) html.push(`<div class="m m--ai"><div class="who">CLAUDE</div>${md(t)}</div>`);
     } else {
       const t = userText(b); if (t) html.push(`<div class="m m--me">${md(t)}</div>`);
