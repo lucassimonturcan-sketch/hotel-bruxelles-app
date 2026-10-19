@@ -2,7 +2,7 @@
 const REPO = 'lucassimonturcan-sketch/hotel-bruxelles';
 const SITE = 'https://www.andorrahotelbruxelles.com/fr/';
 const API = 'https://api.github.com';
-const VAPID_PUBLIC = ''; // clé publique des notifications (variable VAPID_PUBLIC_KEY du dépôt)
+const VAPID_PUBLIC = 'BPgWZnAIAiwx006B-UncHnhhIb120dsuy_XPxLa0zCGOHpQnlrekS1IEPuGEXTVQvy9KAIuBe4b8Do-cGN21b0g'; // clé publique des notifications (variable VAPID_PUBLIC_KEY du dépôt)
 const $ = s => document.querySelector(s);
 const main = $('#main'), compose = $('#compose'), txt = $('#txt');
 let token = localStorage.getItem('hb_token') || '';
