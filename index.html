@@ -70,7 +70,7 @@ textarea:focus{border-color:var(--gold)}
 .send{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:var(--gold);color:var(--dark);font-size:20px;cursor:pointer}
 .mic{flex:none;width:46px;height:46px;border-radius:50%;border:1.5px solid var(--light);background:transparent;font-size:20px;cursor:pointer}
 .mic.rec{background:var(--no);border-color:var(--no);color:#fff}
-.thumbs{display:flex;gap:8px;margin-top:8px;overflow-x:auto}.thumbs:empty{display:none}.thumbs div{position:relative;flex:none}.thumbs img{height:64px;width:64px;object-fit:cover;border-radius:10px}.thumbs button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--dark);color:#fff;font-size:13px}
+.thumbs{display:flex;gap:8px;margin-bottom:8px;overflow-x:auto}.thumbs:empty{display:none}.thumbs div{position:relative;flex:none}.thumbs img{height:64px;width:64px;object-fit:cover;border-radius:10px}.thumbs button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--dark);color:#fff;font-size:13px}
 .m--me .shots img{height:150px;border-color:transparent}
 .hint{font-size:12px;color:var(--mid);margin-top:6px;text-align:center}
 /* connexion */
@@ -83,30 +83,27 @@ textarea:focus{border-color:var(--gold)}
 .zoom{position:fixed;inset:0;background:rgba(10,10,10,.92);z-index:20;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top) + 50px) 10px 20px}
 .zoom img{max-width:100%;border-radius:8px}
 .zoom button{position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:12px;font-size:30px;color:#fff;background:none;border:0}
+.day{align-self:center;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--mid);margin:14px 0 4px}
+.file{display:inline-block;background:rgba(255,255,255,.12);border-radius:10px;padding:6px 10px;font-size:14px;margin-top:6px}
+.thumbs .doc{height:64px;width:64px;border-radius:10px;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;padding:4px;overflow:hidden;word-break:break-all}
 .hidden{display:none!important}
 </style>
 </head>
 <body>
 <header>
-  <button class="ico hidden" id="back" aria-label="Retour">‹</button>
   <h1 id="title">Hôtel Bruxelles<small>Assistant du site</small></h1>
   <button class="ico hidden" id="site" aria-label="Voir le site">⌂</button>
 </header>
 <main id="main"></main>
 <div class="compose hidden" id="compose"><div class="in">
-  <div class="mode" id="mode">
-    <button data-m="do" class="on">✏️ Modifier le site</button>
-    <button data-m="idea">💡 Réfléchir à une idée</button>
-  </div>
+  <div class="thumbs" id="thumbs"></div>
   <div class="row">
-    <button class="mic" id="pic" aria-label="Ajouter une photo">📷</button>
-    <input type="file" id="file" accept="image/*" multiple hidden>
+    <button class="mic" id="pic" aria-label="Ajouter des photos ou des fichiers">📎</button>
+    <input type="file" id="file" multiple hidden>
+    <textarea id="txt" rows="1" placeholder="Écrire à Claude…"></textarea>
     <button class="mic" id="mic" aria-label="Dicter">🎤</button>
-    <textarea id="txt" rows="1" placeholder="Écrivez votre demande…"></textarea>
     <button class="send" id="send" aria-label="Envoyer">➤</button>
   </div>
-  <div class="thumbs" id="thumbs"></div>
-  <div class="hint" id="hint">Vous pouvez aussi dicter avec le micro du clavier.</div>
 </div></div>
 <script src="app.js"></script>
 </body>
