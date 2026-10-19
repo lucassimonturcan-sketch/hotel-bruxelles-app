@@ -5,6 +5,7 @@ const REPO = 'lucassimonturcan-sketch/hotel-bruxelles';
 const SITE = 'https://www.andorrahotelbruxelles.com/fr/';
 const API = 'https://api.github.com';
 const VAPID_PUBLIC = 'BPgWZnAIAiwx006B-UncHnhhIb120dsuy_XPxLa0zCGOHpQnlrekS1IEPuGEXTVQvy9KAIuBe4b8Do-cGN21b0g'; // clé publique des notifications (variable VAPID_PUBLIC_KEY du dépôt)
+const NAMES = { 'lucassimonturcan-sketch': 'Lucas' }; // prénoms affichés au-dessus des messages de l'autre personne
 const PAUSE = 3 * 3600e3;   // après 3 h sans échange, une nouvelle série commence
 const HISTORY = 12;         // nombre de séries affichées
 const $ = s => document.querySelector(s);
@@ -95,7 +96,7 @@ function renderIssue(issue, comments) {
       const pics = [...b.matchAll(/<!--photo:(\S+)-->/g)].map(x => x[1]);
       const docs = [...b.matchAll(/<!--fichier:(\S+)-->/g)].map(x => x[1].split('/').pop());
       const t = userText(b);
-      if (t || pics.length || docs.length) html.push(`<div class="m m--me">${t ? md(t) : ''}${pics.length ? `<div class="shots">${pics.map(f => `<img data-src="${f}" data-ref="envois" alt="Photo envoyée">`).join('')}</div>` : ''}${docs.map(d => `<div class="file">Fichier : ${esc(d)}</div>`).join('')}</div>`);
+      if (t || pics.length || docs.length) html.push(`${c.user.login !== me ? `<div class="who-me">${esc(NAMES[c.user.login] || c.user.login)}</div>` : ''}<div class="m m--me">${t ? md(t) : ''}${pics.length ? `<div class="shots">${pics.map(f => `<img data-src="${f}" data-ref="envois" alt="Photo envoyée">`).join('')}</div>` : ''}${docs.map(d => `<div class="file">Fichier : ${esc(d)}</div>`).join('')}</div>`);
     }
   });
   return html.join('');
