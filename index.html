@@ -4,20 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hôtel Bruxelles</title>
-<meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#1C1B19">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon.svg">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hôtel Bruxelles">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 @font-face{font-family:'Theano Didot';src:url(fonts/TheanoDidot-Regular.woff2) format('woff2');font-display:swap}
-/* Style inspiré de l'application Claude : sobre, clair, sans emoji */
-:root{--bg:#FAF9F5;--panel:#FFFFFF;--bubble:#F0EEE6;--text:#1F1E1D;--muted:#73726C;--line:#E5E3DA;--accent:#C96442;--accent-ink:#FFFFFF;--ok:#3F7A4E;--no:#B3433A;--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.05)}
-@media (prefers-color-scheme:dark){:root{--bg:#262624;--panel:#30302E;--bubble:#3A3A37;--text:#ECEBE6;--muted:#A3A29C;--line:#45443F;--shadow:none}}
+/* Style inspiré de l'application Claude : sobre, sombre, sans emoji */
+:root{--bg:#1C1B19;--panel:#262523;--bubble:#33322F;--text:#ECEBE6;--muted:#9C9B95;--line:#3A3936;--accent:#D97757;--gold:#D4B978;--accent-ink:#FFFFFF;--ok:#5FA36E;--no:#E0786E;--shadow:0 10px 40px rgba(0,0,0,.45)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow-x:hidden}
 body{background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
@@ -53,15 +51,18 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .notif{align-self:center;background:none;border:0;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer}
 .empty{text-align:center;color:var(--muted);padding:40px 10px}
 /* zone d'écriture */
-.compose{padding:8px 12px calc(env(safe-area-inset-bottom) + 10px);background:var(--bg)}
-.box{max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:10px 10px 8px 14px}
+.compose{padding:10px 12px calc(env(safe-area-inset-bottom) + 12px);background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.box{position:relative;max-width:720px;margin:0 auto;background:rgba(38,37,35,.78);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-radius:24px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.05);padding:12px 10px 8px 16px;transition:box-shadow .3s}
+.box::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(120deg,rgba(217,119,87,.75),rgba(212,185,120,.35) 40%,rgba(255,255,255,.06) 70%,rgba(217,119,87,.5));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.box:focus-within{box-shadow:var(--shadow),0 0 0 4px rgba(217,119,87,.12),0 0 32px rgba(217,119,87,.18)}
+.box .label{position:absolute;top:-9px;left:18px;font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);background:var(--bg);padding:2px 8px;border-radius:6px}
 textarea{width:100%;resize:none;border:0;background:transparent;outline:none;min-height:24px;max-height:160px;font-size:16px;line-height:1.45;padding:2px 0 6px}
 textarea::placeholder{color:var(--muted)}
 .bar{display:flex;align-items:center;gap:4px}
 .bar .sp{flex:1}
-.tool{width:34px;height:34px;border-radius:10px;border:0;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tool{width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02);margin-right:4px;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .tool.rec{color:var(--no)}
-.send{width:34px;height:34px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.send{width:36px;height:36px;border-radius:12px;border:0;background:linear-gradient(135deg,#E08A6A,var(--accent));box-shadow:0 4px 14px rgba(217,119,87,.35);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .send:disabled{opacity:.4}
 .thumbs{display:flex;gap:8px;margin-bottom:8px;overflow-x:auto}.thumbs:empty{display:none}
 .thumbs div{position:relative;flex:none}.thumbs img{height:56px;width:56px;object-fit:cover;border-radius:10px}
@@ -88,8 +89,9 @@ textarea::placeholder{color:var(--muted)}
 </header>
 <main id="main"></main>
 <div class="compose hidden" id="compose"><div class="box">
+  <span class="label">Agent · Hôtel Bruxelles</span>
   <div class="thumbs" id="thumbs"></div>
-  <textarea id="txt" rows="1" placeholder="Écrire à Claude…"></textarea>
+  <textarea id="txt" rows="1" placeholder="Écrire à l’agent…"></textarea>
   <div class="bar">
     <button class="tool" id="pic" aria-label="Joindre des photos ou des fichiers"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button>
     <input type="file" id="file" multiple hidden>
@@ -103,6 +105,6 @@ textarea::placeholder{color:var(--muted)}
 window.onerror = function (m, s, l) { var d = document.getElementById('main'); if (d && !d.children.length) d.innerHTML = '<div class="empty">Erreur de démarrage : ' + m + ' (ligne ' + l + ')<br><br>Fermez et rouvrez l’application.</div>'; };
 setTimeout(function () { var d = document.getElementById('main'); if (d && !d.children.length) d.innerHTML = '<div class="empty">Chargement impossible. Vérifiez la connexion internet, puis fermez et rouvrez l’application.</div>'; }, 8000);
 </script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

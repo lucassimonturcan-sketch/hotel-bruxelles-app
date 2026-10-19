@@ -89,7 +89,7 @@ function renderIssue(issue, comments) {
       return html.push(`<div class="m m--ai"><div class="cap">Aperçu sur téléphone et ordinateur</div><div class="shots">${shot[2].trim().split(/\s+/).map(f => `<img data-src="${f}" data-ref="apercus" alt="Aperçu">`).join('')}</div>${acts}</div>`);
     }
     if (c.user.type === 'Bot' || /\[bot\]$/.test(c.user.login)) {
-      if (working && k === lastBot) return; // message provisoire (en anglais) remplacé par « Claude travaille… »
+      if (working && k === lastBot) return; // message provisoire (en anglais) remplacé par « L’agent travaille… »
       const t = cleanAI(b); if (t) html.push(`<div class="m m--ai">${md(t)}</div>`);
     } else {
       const pics = [...b.matchAll(/<!--photo:(\S+)-->/g)].map(x => x[1]);
@@ -119,10 +119,10 @@ async function showChat() {
   if (!busy && waitingSince && Date.now() - waitingSince > 90000) waitingSince = 0;
   const canNotif = VAPID_PUBLIC && 'PushManager' in window && 'Notification' in window && Notification.permission === 'default';
   main.innerHTML = `<div class="wrap"><div class="msgs">
-    ${issues.length ? '' : '<div class="m m--ai"><p>Bonjour. Je connais tout le site de l’Hôtel Bruxelles. Posez-moi une question, proposez une idée ou dites-moi ce qu’il faut changer. Vous pouvez joindre des photos et des fichiers.</p></div>'}
+    ${issues.length ? '' : '<div class="m m--ai"><p>Bonjour. Je suis l’agent du site. Je connais tout le site de l’Hôtel Bruxelles. Posez-moi une question, proposez une idée ou dites-moi ce qu’il faut changer. Vous pouvez joindre des photos et des fichiers.</p></div>'}
     ${issues.map((i, n) => renderIssue(i, comments[n])).join('')}
-    ${waiting ? `<div class="typing"><svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.2L20 6l-4.4 4.8L22 12l-6.4 1.2L20 18l-6.4-2.2L12 22l-1.6-6.2L4 18l4.4-4.8L2 12l6.4-1.2L4 6l6.4 2.2z"/></svg>${publishing ? 'Publication en cours… (1 à 2 min)' : 'Claude travaille… (environ 1 min)'}</div>` : ''}
-    ${canNotif ? '<button class="notif" id="notif">Être prévenu quand Claude répond</button>' : ''}
+    ${waiting ? `<div class="typing"><svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.2L20 6l-4.4 4.8L22 12l-6.4 1.2L20 18l-6.4-2.2L12 22l-1.6-6.2L4 18l4.4-4.8L2 12l6.4-1.2L4 6l6.4 2.2z"/></svg>${publishing ? 'Publication en cours… (1 à 2 min)' : 'L’agent travaille… (environ 1 min)'}</div>` : ''}
+    ${canNotif ? '<button class="notif" id="notif">Être prévenu quand l’agent répond</button>' : ''}
   </div></div>`;
   main.querySelectorAll('img[data-src]').forEach(async im => { im.src = await loadImg(im.dataset.src, im.dataset.ref); im.onclick = () => zoom(im.src); });
   main.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => publish(+b.dataset.pub, b));
@@ -156,7 +156,7 @@ async function send() {
     } else {
       await post('/issues', { title: t.length > 60 ? t.slice(0, 57).trim() + '…' : t, body, labels: ['app'] });
     }
-    txt.value = ''; files = []; drawThumbs(); autosize(); txt.placeholder = 'Écrire à Claude…';
+    txt.value = ''; files = []; drawThumbs(); autosize(); txt.placeholder = 'Écrire à l’agent…';
     waitingSince = Date.now(); showChat.done = false; showChat();
   } catch (e) { alert("L'envoi n'a pas marché. Vérifiez la connexion internet et réessayez."); }
   $('#send').disabled = false;
@@ -245,7 +245,7 @@ async function enableNotif() {
     const path = `abonnements/${me}-${h}.json`;
     const old = await api(`/repos/${REPO}/contents/${path}?ref=notifications`);
     await post(`/contents/${path}`, { message: 'Notifications : ' + me, branch: 'notifications', content: b64(JSON.stringify({ login: me, sub })), ...(old.sha ? { sha: old.sha } : {}) }, 'PUT');
-    alert('C’est activé ! Vous serez prévenu dès que Claude répond.'); showChat();
+    alert('C’est activé ! Vous serez prévenu dès que l’agent répond.'); showChat();
   } catch (e) { alert('Activation impossible (' + e.message + '). L’application doit être ouverte depuis l’écran d’accueil.'); }
 }
 
