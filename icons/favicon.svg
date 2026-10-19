@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="3" fill="#1A1714"/>
+  <text
+    x="16"
+    y="22"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="14"
+    font-weight="bold"
+    fill="#B89B5E"
+    text-anchor="middle"
+    letter-spacing="0.5"
+  >HB</text>
+  <rect x="5" y="25" width="22" height="0.75" fill="#B89B5E" opacity="0.6"/>
+</svg>
