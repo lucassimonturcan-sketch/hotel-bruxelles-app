@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carte du ski 3D</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1A1714">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+@font-face{font-family:'Theano Didot';src:url(../fonts/TheanoDidot-Regular.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Free Sans';src:url(../fonts/FreeSans.woff2) format('woff2');font-weight:100 500;font-display:swap}
+@font-face{font-family:'Free Sans';src:url(../fonts/FreeSans-Bold.woff2) format('woff2');font-weight:600 900;font-display:swap}
+:root{--dark:#1A1714;--dark2:#2A2520;--mid:#8A8078;--cream:#F5F0E8;--gold:#B89B5E;--gold2:#D4B978;--green:#2E9E4F;--blue:#2A6FDB;--red:#D93A3A;--black:#141414}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--dark)}
+body{font:15px/1.4 'Free Sans',system-ui,sans-serif;color:var(--cream);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+#map{position:absolute;inset:0}
+/* panneau du haut */
+.top{position:absolute;top:calc(env(safe-area-inset-top) + 12px);left:12px;right:12px;display:flex;gap:10px;align-items:flex-start;pointer-events:none;z-index:2}
+.brand{pointer-events:auto;background:rgba(26,23,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(212,185,120,.25);border-radius:14px;padding:10px 14px}
+.brand h1{font:400 19px/1.1 'Theano Didot',serif;letter-spacing:.02em}
+.brand small{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);margin-top:3px}
+.seg{pointer-events:auto;margin-left:auto;display:flex;background:rgba(26,23,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(212,185,120,.25);border-radius:12px;padding:3px}
+.seg button{border:0;background:none;padding:8px 12px;border-radius:9px;font-size:13px;letter-spacing:.04em;color:var(--mid)}
+.seg button.on{background:var(--gold);color:var(--dark);font-weight:600}
+/* secteurs */
+.sectors{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 14px);display:flex;gap:8px;overflow-x:auto;padding:0 12px;z-index:2;scrollbar-width:none}
+.sectors::-webkit-scrollbar{display:none}
+.sectors button{flex:none;border:1px solid rgba(212,185,120,.3);background:rgba(26,23,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:999px;padding:9px 14px;font-size:13px;white-space:nowrap}
+.sectors button.hotel{border-color:var(--gold);color:var(--gold2)}
+/* légende et filtres */
+.legend{position:absolute;right:12px;top:calc(env(safe-area-inset-top) + 76px);display:flex;flex-direction:column;gap:6px;z-index:2}
+.legend button{display:flex;align-items:center;gap:8px;border:1px solid rgba(212,185,120,.2);background:rgba(26,23,20,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:10px;padding:6px 10px;font-size:12px}
+.legend i{width:14px;height:4px;border-radius:2px;display:block}
+.legend button.off{opacity:.35}
+/* fiche piste */
+.sheet{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 66px);max-width:420px;background:rgba(26,23,20,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(212,185,120,.3);border-radius:16px;padding:14px 16px 16px;z-index:3;transform:translateY(20px);opacity:0;pointer-events:none;transition:.25s}
+.sheet.show{transform:none;opacity:1;pointer-events:auto}
+.sheet .x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--mid);font-size:22px}
+.sheet .kind{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);display:flex;align-items:center;gap:8px}
+.sheet .kind i{width:10px;height:10px;border-radius:50%;display:block}
+.sheet h2{font:400 22px/1.2 'Theano Didot',serif;margin:4px 0 10px;padding-right:20px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stats div{background:var(--dark2);border-radius:10px;padding:8px 6px;text-align:center}
+.stats b{display:block;font-size:16px;font-weight:600}
+.stats span{font-size:11px;color:var(--mid)}
+.prof{margin-top:10px;height:70px;width:100%}
+.note{margin-top:8px;font-size:11px;color:var(--mid)}
+/* contrôles MapLibre aux couleurs du site */
+.maplibregl-ctrl-group{background:rgba(26,23,20,.86)!important;border:1px solid rgba(212,185,120,.25);border-radius:12px!important;overflow:hidden}
+.maplibregl-ctrl-group button{width:40px!important;height:40px!important}
+.maplibregl-ctrl-group button+button{border-top:1px solid rgba(212,185,120,.15)!important}
+.maplibregl-ctrl-icon{filter:invert(.85) sepia(.4)}
+.maplibregl-ctrl-bottom-right{bottom:calc(env(safe-area-inset-bottom) + 60px)}
+.maplibregl-ctrl-attrib{font-size:10px;background:rgba(26,23,20,.7)!important;color:var(--mid)}
+.maplibregl-ctrl-attrib a{color:var(--mid)}
+.maplibregl-ctrl-attrib-button{filter:invert(1)}
+.hb{width:38px;height:38px;border-radius:50%;background:var(--dark);border:2px solid var(--gold2);color:var(--gold2);font:400 15px/34px 'Theano Didot',serif;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.hb-tip{position:absolute;left:46px;top:6px;white-space:nowrap;background:rgba(26,23,20,.9);border-radius:8px;padding:4px 8px;font:12px 'Free Sans',sans-serif;color:var(--cream)}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--dark);z-index:9;transition:opacity .6s}
+.loading p{font:400 22px 'Theano Didot',serif;color:var(--gold2);letter-spacing:.04em}
+@media (min-width:800px){.sheet{left:auto;right:70px;bottom:80px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="loading" id="loading"><p>Chargement du relief…</p></div>
+<div class="top">
+  <div class="brand"><h1>Hôtel Bruxelles</h1><small>Pistes d’Andorre en 3D</small></div>
+  <div class="seg" id="seg"><button data-s="hiver" class="on">Hiver</button><button data-s="sat">Satellite</button></div>
+</div>
+<div class="legend" id="legend"></div>
+<div class="sectors" id="sectors"></div>
+<div class="sheet" id="sheet"><button class="x" id="sx" aria-label="Fermer">×</button><div id="sc"></div></div>
+<script>
+// Prototype : carte du ski en 3D (relief réel, pistes et remontées OpenStreetMap)
+const HOTEL = [1.666509, 42.576807];
+const COLORS = { green: '#2E9E4F', blue: '#2A6FDB', red: '#D93A3A', black: '#141414', free: '#E07B39' };
+const NAMES = { green: 'Piste verte', blue: 'Piste bleue', red: 'Piste rouge', black: 'Piste noire', free: 'Itinéraire hors-piste' };
+const LIFTS = { gondola: 'Télécabine', cable_car: 'Téléphérique', chair_lift: 'Télésiège', drag_lift: 'Téléski', platter: 'Téléski', 't-bar': 'Téléski', 'j-bar': 'Téléski', rope_tow: 'Fil-neige', magic_carpet: 'Tapis roulant' };
+const DEM = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
+
+const map = new maplibregl.Map({
+  container: 'map',
+  center: [1.659, 42.537], zoom: innerWidth < 600 ? 12.2 : 12.9, pitch: 55, bearing: 195, maxPitch: 82,
+  attributionControl: false,
+  style: {
+    version: 8,
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sky: { 'sky-color': '#7FA9D8', 'sky-horizon-blend': 0.55, 'horizon-color': '#E9EEF4', 'horizon-fog-blend': 0.6, 'fog-color': '#EEF2F6', 'fog-ground-blend': 0.35, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0.6, 15, 0.2] },
+    sources: {
+      sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics' },
+      dem: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Relief : Mapzen / AWS Terrain Tiles' },
+      demh: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14 }
+    },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': '#EEF2F6' } },
+      { id: 'sat', type: 'raster', source: 'sat', paint: { 'raster-saturation': -0.9, 'raster-brightness-min': 0.38, 'raster-contrast': -0.15, 'raster-opacity': 0.6 } },
+      { id: 'shade', type: 'hillshade', source: 'demh', paint: { 'hillshade-exaggeration': 0.8, 'hillshade-shadow-color': '#3E527A', 'hillshade-highlight-color': '#FFFFFF', 'hillshade-accent-color': '#8DA2C2', 'hillshade-illumination-direction': 315 } }
+    ]
+  }
+});
+map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: 'Pistes © contributeurs OpenStreetMap (ODbL)' }), 'bottom-left');
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+const geo = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showUserHeading: true });
+map.addControl(geo, 'bottom-right');
+
+/* ---------- Styles Hiver / Satellite ---------- */
+function setStyle(s) {
+  const hiver = s === 'hiver';
+  map.setPaintProperty('sat', 'raster-saturation', hiver ? -0.9 : 0.05);
+  map.setPaintProperty('sat', 'raster-brightness-min', hiver ? 0.38 : 0);
+  map.setPaintProperty('sat', 'raster-contrast', hiver ? -0.15 : 0.05);
+  map.setPaintProperty('sat', 'raster-opacity', hiver ? 0.6 : 1);
+  map.setPaintProperty('shade', 'hillshade-exaggeration', hiver ? 0.8 : 0.18);
+  map.setPaintProperty('shade', 'hillshade-shadow-color', hiver ? '#3E527A' : '#000000');
+  map.setPaintProperty('shade', 'hillshade-highlight-color', hiver ? '#FFFFFF' : 'rgba(255,255,255,0)');
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+}
+document.getElementById('seg').onclick = e => { const b = e.target.closest('button'); if (b) setStyle(b.dataset.s); };
+
+/* ---------- Altitudes (relief réel, lu dans les tuiles de relief) ---------- */
+const tiles = {};
+function tileOf(lon, lat, z) { const n = 2 ** z, r = lat * Math.PI / 180; return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n]; }
+function loadTile(z, x, y) {
+  const k = `${z}/${x}/${y}`;
+  return tiles[k] || (tiles[k] = new Promise((ok, ko) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.drawImage(im, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
+    im.onerror = ko; im.src = DEM.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+  }));
+}
+async function elev(lon, lat) {
+  const z = 14, [fx, fy] = tileOf(lon, lat, z), tx = Math.floor(fx), ty = Math.floor(fy);
+  const d = await loadTile(z, tx, ty), i = (Math.min(255, Math.floor((fy - ty) * 256)) * 256 + Math.min(255, Math.floor((fx - tx) * 256))) * 4;
+  return d[i] * 256 + d[i + 1] + d[i + 2] / 256 - 32768;
+}
+const dist = (a, b) => { const R = 6371000, r = Math.PI / 180, dl = (b[1] - a[1]) * r, dn = (b[0] - a[0]) * r * Math.cos((a[1] + b[1]) / 2 * r); return R * Math.hypot(dl, dn); };
+async function profile(coords) {
+  // points tous les ~20 m le long du tracé
+  const pts = [coords[0]];
+  for (let i = 1; i < coords.length; i++) {
+    const a = coords[i - 1], b = coords[i], n = Math.max(1, Math.round(dist(a, b) / 20));
+    for (let k = 1; k <= n; k++) pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+  }
+  const zs = await Promise.all(pts.map(p => elev(p[0], p[1])));
+  let d = 0; const prof = pts.map((p, i) => { if (i) d += dist(pts[i - 1], p); return [d, zs[i]]; });
+  if (prof[0][1] < prof[prof.length - 1][1]) { const L = prof[prof.length - 1][0]; prof.reverse(); prof.forEach(p => p[0] = L - p[0]); }
+  return prof;
+}
+
+/* ---------- Données ---------- */
+let SKI;
+const line = g => g.map(([la, lo]) => [lo, la]);
+map.on('load', async () => {
+  map.setTerrain({ source: 'dem', exaggeration: 1.35 });
+  SKI = await (await fetch('ski.json')).json();
+  const pistes = { type: 'FeatureCollection', features: SKI.p.map((p, i) => ({ type: 'Feature', id: i, properties: { n: p.n || '', c: p.c, s: p.s || '' }, geometry: { type: 'LineString', coordinates: line(p.g) } })) };
+  const lifts = { type: 'FeatureCollection', features: SKI.l.map((l, i) => ({ type: 'Feature', id: i, properties: { n: l.n || '', k: l.k, s: l.s || '' }, geometry: { type: 'LineString', coordinates: line(l.g) } })) };
+  const ends = { type: 'FeatureCollection', features: SKI.l.flatMap(l => [l.g[0], l.g[l.g.length - 1]].map(p => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [p[1], p[0]] } }))) };
+  map.addSource('pistes', { type: 'geojson', data: pistes });
+  map.addSource('lifts', { type: 'geojson', data: lifts });
+  map.addSource('ends', { type: 'geojson', data: ends });
+  const W = (a, b) => ['interpolate', ['exponential', 1.6], ['zoom'], 11, a, 16, b];
+  const col = ['match', ['get', 'c'], 'green', COLORS.green, 'blue', COLORS.blue, 'red', COLORS.red, 'black', COLORS.black, COLORS.free];
+  map.addLayer({ id: 'p-case', type: 'line', source: 'pistes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FFFFFF', 'line-width': W(2.6, 11), 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'p-line', type: 'line', source: 'pistes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': W(1.6, 7) } });
+  map.addLayer({ id: 'p-sel', type: 'line', source: 'pistes', filter: ['==', ['id'], -1], layout: { 'line-cap': 'round' }, paint: { 'line-color': '#D4B978', 'line-width': W(5, 16), 'line-opacity': 0.75, 'line-blur': 2 } }, 'p-case');
+  map.addLayer({ id: 'l-line', type: 'line', source: 'lifts', paint: { 'line-color': '#1A1714', 'line-width': W(1.4, 4), 'line-dasharray': [3, 1.2] } });
+  map.addLayer({ id: 'l-end', type: 'circle', source: 'ends', paint: { 'circle-radius': W(2, 6), 'circle-color': '#1A1714', 'circle-stroke-color': '#D4B978', 'circle-stroke-width': 1.5 } });
+  map.addLayer({ id: 'p-hit', type: 'line', source: 'pistes', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 22 } });
+  map.addLayer({ id: 'l-hit', type: 'line', source: 'lifts', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 22 } });
+  const label = { 'text-font': ['Noto Sans Bold'], 'symbol-placement': 'line', 'text-size': ['interpolate', ['linear'], ['zoom'], 13, 10, 16, 13], 'text-max-angle': 35, 'symbol-spacing': 280 };
+  map.addLayer({ id: 'p-lab', type: 'symbol', source: 'pistes', minzoom: 13.2, layout: { ...label, 'text-field': ['get', 'n'] }, paint: { 'text-color': col, 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } });
+  map.addLayer({ id: 'l-lab', type: 'symbol', source: 'lifts', minzoom: 12.6, layout: { ...label, 'text-field': ['get', 'n'], 'text-font': ['Noto Sans Regular'] }, paint: { 'text-color': '#1A1714', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } });
+
+  // l'hôtel
+  const el = document.createElement('div'); el.style.position = 'relative';
+  el.innerHTML = '<div class="hb">HB</div><div class="hb-tip">Hôtel Bruxelles · télécabine à 100 m</div>';
+  new maplibregl.Marker({ element: el, anchor: 'left' }).setLngLat(HOTEL).addTo(map);
+
+  // secteurs, calculés depuis les pistes
+  const sec = {};
+  SKI.p.forEach(p => { if (!p.s) return; const s = sec[p.s] || (sec[p.s] = []); p.g.forEach(c => s.push(c)); });
+  const bar = document.getElementById('sectors');
+  const go = (b, z) => map.flyTo({ ...b, zoom: z || 14.2, pitch: 68, duration: 2600, essential: true });
+  bar.innerHTML = '<button class="hotel" data-k="hotel">Hôtel</button>' + Object.keys(sec).sort((a, b) => sec[b].length - sec[a].length).map(s => `<button data-k="${s}">${s}</button>`).join('');
+  bar.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.k === 'hotel') return go({ center: HOTEL, bearing: 200 }, 15);
+    const pts = sec[b.dataset.k], la = pts.reduce((s, p) => s + p[0], 0) / pts.length, lo = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    go({ center: [lo, la], bearing: map.getBearing() });
+  };
+
+  // légende = filtres par couleur
+  const shown = new Set(Object.keys(COLORS));
+  const lg = document.getElementById('legend');
+  lg.innerHTML = Object.entries(COLORS).filter(([k]) => k !== 'free').map(([k, c]) => `<button data-c="${k}"><i style="background:${c}"></i>${NAMES[k].replace('Piste ', '')}</button>`).join('');
+  lg.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    shown.has(b.dataset.c) ? shown.delete(b.dataset.c) : shown.add(b.dataset.c); b.classList.toggle('off');
+    const f = ['in', ['get', 'c'], ['literal', [...shown]]];
+    ['p-case', 'p-line', 'p-hit', 'p-lab'].forEach(id => map.setFilter(id, f));
+  };
+
+  map.on('click', 'p-hit', e => showPiste(e.features[0]));
+  map.on('click', 'l-hit', e => showLift(e.features[0]));
+  ['p-hit', 'l-hit'].forEach(id => { map.on('mouseenter', id, () => map.getCanvas().style.cursor = 'pointer'); map.on('mouseleave', id, () => map.getCanvas().style.cursor = ''); });
+  // l'écran de chargement disparaît dès que le relief est prêt (au plus tard après 4 s)
+  const hide = () => { const l = document.getElementById('loading'); if (!l) return; l.style.opacity = 0; setTimeout(() => l.remove(), 700); };
+  map.once('idle', hide); setTimeout(hide, 4000);
+  // petit survol d'introduction
+  setTimeout(() => map.easeTo({ bearing: 200, duration: 7000 }), 900);
+});
+
+/* ---------- Fiches ---------- */
+const sheet = document.getElementById('sheet'), sc = document.getElementById('sc');
+document.getElementById('sx').onclick = () => { sheet.classList.remove('show'); map.setFilter('p-sel', ['==', ['id'], -1]); };
+const fmt = m => m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m';
+function profSvg(pr, color) {
+  const L = pr[pr.length - 1][0], zs = pr.map(p => p[1]), lo = Math.min(...zs), hi = Math.max(...zs), W = 380, H = 70;
+  const pts = pr.map(([d, z]) => `${(d / L * W).toFixed(1)},${(H - 6 - (z - lo) / Math.max(1, hi - lo) * (H - 14)).toFixed(1)}`).join(' ');
+  return `<svg class="prof" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polygon points="0,${H} ${pts} ${W},${H}" fill="${color}" opacity=".18"/><polyline points="${pts}" fill="none" stroke="${color === '#141414' ? '#D4B978' : color}" stroke-width="2"/></svg>`;
+}
+async function fiche(kind, dot, name, coords, extra) {
+  sc.innerHTML = `<div class="kind"><i style="background:${dot}"></i>${kind}</div><h2>${name || 'Sans nom'}</h2><div class="stats"><div><b>…</b><span>Longueur</span></div><div><b>…</b><span>Dénivelé</span></div><div><b>…</b><span>Pente moy.</span></div><div><b>…</b><span>Altitude</span></div></div>`;
+  sheet.classList.add('show');
+  const pr = await profile(coords), L = pr[pr.length - 1][0], top = pr[0][1], bot = pr[pr.length - 1][1], drop = top - bot;
+  sc.querySelector('.stats').innerHTML = `<div><b>${fmt(L)}</b><span>Longueur</span></div><div><b>${Math.round(drop)} m</b><span>Dénivelé</span></div><div><b>${Math.round(drop / L * 100)} %</b><span>Pente moy.</span></div><div><b>${Math.round(top)} m</b><span>En haut</span></div>`;
+  sc.insertAdjacentHTML('beforeend', profSvg(pr, dot) + `<p class="note">Profil calculé sur le relief réel. Départ ${Math.round(top)} m, arrivée ${Math.round(bot)} m.${extra || ''}</p>`);
+}
+function showPiste(f) {
+  map.setFilter('p-sel', ['==', ['id'], f.id]);
+  const p = SKI.p[f.id];
+  fiche(NAMES[p.c] + (p.s ? ' · ' + p.s : ''), COLORS[p.c], p.n, line(p.g));
+}
+function showLift(f) {
+  map.setFilter('p-sel', ['==', ['id'], -1]);
+  const l = SKI.l[f.id];
+  fiche((LIFTS[l.k] || 'Remontée') + (l.s ? ' · ' + l.s : ''), '#D4B978', l.n, line(l.g));
+}
+</script>
+</body>
+</html>
