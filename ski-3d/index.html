@@ -99,7 +99,8 @@ const map = new maplibregl.Map({
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sky: { 'sky-color': '#7FA9D8', 'sky-horizon-blend': 0.55, 'horizon-color': '#E9EEF4', 'horizon-fog-blend': 0.6, 'fog-color': '#EEF2F6', 'fog-ground-blend': 0.35, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0.6, 15, 0.2] },
     sources: {
-      sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 18, attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics' },
+      // tuiles déclarées en 128 px : la carte prend les photos du niveau de détail supérieur (deux fois plus nettes)
+      sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 128, maxzoom: 19, attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics' },
       dem: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 12, attribution: 'Relief : Mapzen / AWS Terrain Tiles' },
       demh: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
     },
@@ -123,7 +124,7 @@ function setStyle(s) {
   map.setLayoutProperty('sat', 'visibility', hiver ? 'none' : 'visible');
   map.setPaintProperty('sat', 'raster-saturation', hiver ? -0.9 : 0.05);
   map.setPaintProperty('sat', 'raster-brightness-min', hiver ? 0.38 : 0);
-  map.setPaintProperty('sat', 'raster-contrast', hiver ? -0.15 : 0.05);
+  map.setPaintProperty('sat', 'raster-contrast', hiver ? -0.15 : 0.12);
   map.setPaintProperty('sat', 'raster-opacity', 1);
   map.setPaintProperty('shade', 'hillshade-exaggeration', hiver ? 0.9 : 0.18);
   map.setPaintProperty('shade', 'hillshade-shadow-color', hiver ? '#3E527A' : '#000000');
