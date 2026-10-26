@@ -101,13 +101,16 @@ const map = new maplibregl.Map({
     sources: {
       // tuiles déclarées en 128 px : la carte prend les photos du niveau de détail supérieur (deux fois plus nettes)
       sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 128, maxzoom: 19, attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics' },
-      dem: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 12, attribution: 'Relief : Mapzen / AWS Terrain Tiles' },
-      demh: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 13 }
+      dem: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 13, attribution: 'Relief : Mapzen / AWS Terrain Tiles' },
+      demh: { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14 },
+      // relief ombré très détaillé (Esri), pour un rendu Hiver net
+      hs: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}'], tileSize: 128, maxzoom: 16, attribution: 'Relief ombré © Esri' }
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#F1F4F8' } },
       { id: 'sat', type: 'raster', source: 'sat', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.9, 'raster-brightness-min': 0.38, 'raster-contrast': -0.15, 'raster-opacity': 0.6 } },
-      { id: 'shade', type: 'hillshade', source: 'demh', paint: { 'hillshade-exaggeration': 0.9, 'hillshade-shadow-color': '#3E527A', 'hillshade-highlight-color': '#FFFFFF', 'hillshade-accent-color': '#8DA2C2', 'hillshade-illumination-direction': 315 } }
+      { id: 'hs', type: 'raster', source: 'hs', paint: { 'raster-opacity': 0.55, 'raster-contrast': 0.25, 'raster-brightness-min': 0.12 } },
+      { id: 'shade', type: 'hillshade', source: 'demh', paint: { 'hillshade-exaggeration': 0.6, 'hillshade-shadow-color': '#3E527A', 'hillshade-highlight-color': '#FFFFFF', 'hillshade-accent-color': '#8DA2C2', 'hillshade-illumination-direction': 315 } }
     ]
   }
 });
@@ -122,11 +125,12 @@ map.addControl(geo, 'bottom-right');
 function setStyle(s) {
   const hiver = s === 'hiver';
   map.setLayoutProperty('sat', 'visibility', hiver ? 'none' : 'visible');
+  map.setLayoutProperty('hs', 'visibility', hiver ? 'visible' : 'none');
   map.setPaintProperty('sat', 'raster-saturation', hiver ? -0.9 : 0.05);
   map.setPaintProperty('sat', 'raster-brightness-min', hiver ? 0.38 : 0);
   map.setPaintProperty('sat', 'raster-contrast', hiver ? -0.15 : 0.12);
   map.setPaintProperty('sat', 'raster-opacity', 1);
-  map.setPaintProperty('shade', 'hillshade-exaggeration', hiver ? 0.9 : 0.18);
+  map.setPaintProperty('shade', 'hillshade-exaggeration', hiver ? 0.6 : 0.18);
   map.setPaintProperty('shade', 'hillshade-shadow-color', hiver ? '#3E527A' : '#000000');
   map.setPaintProperty('shade', 'hillshade-highlight-color', hiver ? '#FFFFFF' : 'rgba(255,255,255,0)');
   document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
