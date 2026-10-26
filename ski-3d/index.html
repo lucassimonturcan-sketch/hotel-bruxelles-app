@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="ski.js"></script>
 <style>
 @font-face{font-family:'Theano Didot';src:url(../fonts/TheanoDidot-Regular.woff2) format('woff2');font-display:swap}
 @font-face{font-family:'Free Sans';src:url(../fonts/FreeSans.woff2) format('woff2');font-weight:100 500;font-display:swap}
@@ -87,7 +88,7 @@ const LIFTS = { gondola: 'Télécabine', cable_car: 'Téléphérique', chair_lif
 const DEM = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 
 // données des pistes téléchargées tout de suite, en parallèle du moteur 3D
-const skiData = fetch('ski.json').then(r => r.json());
+const skiData = window.SKI_DATA ? Promise.resolve(window.SKI_DATA) : fetch('ski.json').then(r => r.json());
 if (!window.maplibregl) document.getElementById('err').style.display = 'block';
 const map = new maplibregl.Map({
   container: 'map', pixelRatio: Math.min(devicePixelRatio || 1, 2), maxTileCacheSize: 120, fadeDuration: 0,
